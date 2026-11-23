@@ -1,6 +1,6 @@
 // Lưu ứng dụng vào máy để dùng khi không có mạng.
 // Khi sửa index.html, đổi số phiên bản dưới đây để điện thoại tải bản mới.
-const CACHE = 'so-chi-tieu-v2';
+const CACHE = 'so-chi-tieu-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -23,14 +23,19 @@ self.addEventListener('activate', e => {
 });
 
 // Mở từ bộ nhớ máy ngay (chạy được khi mất mạng), đồng thời cập nhật ngầm khi có mạng.
+// Font chữ Nunito từ Google Fonts cũng được lưu lại để dùng khi offline.
 self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) return;
+  const url = e.request.url;
+  const same = url.startsWith(self.location.origin);
+  const font = url.startsWith('https://fonts.googleapis.com/') || url.startsWith('https://fonts.gstatic.com/');
+  if (e.request.method !== 'GET' || (!same && !font)) return;
   e.respondWith(
     caches.open(CACHE).then(async cache => {
-      const cached = await cache.match(e.request, {ignoreSearch: true}) ||
+      const cached = await cache.match(e.request, {ignoreSearch: same}) ||
         (e.request.mode === 'navigate' ? await cache.match('./index.html') : undefined);
+      if (cached && font) return cached; // font không đổi, khỏi tải lại
       const network = fetch(e.request)
-        .then(res => { if (res.ok) cache.put(e.request, res.clone()); return res; })
+        .then(res => { if (res.ok || res.type === 'opaque') cache.put(e.request, res.clone()); return res; })
         .catch(() => cached);
       return cached || network;
     })
